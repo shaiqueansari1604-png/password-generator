@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VaultKey — Password Generator</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080d1a;
+      --surface:   #0e1628;
+      --border:    #1a2540;
+      --blue:      #00c8ff;
+      --blue-dim:  #0077aa;
+      --green:     #00e87a;
+      --yellow:    #ffc94d;
+      --red:       #ff4d6d;
+      --text:      #e8f0ff;
+      --muted:     #5a6a8a;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Space Grotesk', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow-x: hidden;
+    }
+
+    /* Background grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow orb */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(0,200,255,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 560px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .logo-text {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+    }
+
+    .logo-text span {
+      color: var(--blue);
+    }
+
+    .tagline {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 0 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,200,255,0.04);
+    }
+
+    /* Output box */
+    .output-wrap {
+      background: #060b16;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 20px 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      min-height: 72px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .output-wrap::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--blue), var(--blue-dim));
+      border-radius: 4px 0 0 4px;
+    }
+
+    #password-output {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--blue);
+      flex: 1;
+      word-break: break-all;
+      letter-spacing: 0.06em;
+      line-height: 1.5;
+      min-height: 28px;
+      transition: opacity 0.1s;
+    }
+
+    #password-output.flash {
+      animation: flash-anim 0.35s ease;
+    }
+
+    @keyframes flash-anim {
+      0%   { opacity: 0.2; letter-spacing: 0.2em; }
+      60%  { opacity: 1;   letter-spacing: 0.07em; }
+      100% { opacity: 1;   letter-spacing: 0.06em; }
+    }
+
+    #password-output.placeholder {
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+    }
+
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover { border-color: var(--blue); color: var(--blue); background: rgba(0,200,255,0.06); }
+    .copy-btn.copied { border-color: var(--green); color: var(--green); background: rgba(0,232,122,0.08); }
+
+    /* Strength bar */
+    .strength-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .strength-label {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      width: 52px;
+      flex-shrink: 0;
+    }
+
+    .strength-bars {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .bar {
+      flex: 1;
+      height: 4px;
+      border-radius: 4px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+
+    .strength-name {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      width: 64px;
+      text-align: right;
+      flex-shrink: 0;
+      transition: color 0.3s;
+    }
+
+    /* Controls */
+    .section-label {
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .length-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .length-val {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--blue);
+      width: 48px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--blue);
+      box-shadow: 0 0 10px rgba(0,200,255,0.5);
+      cursor: pointer;
+    }
+
+    /* Options grid */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+
+    .option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #060b16;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .option:hover { border-color: var(--blue-dim); }
+    .option.active { border-color: var(--blue); background: rgba(0,200,255,0.06); }
+
+    .option-check {
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid var(--border);
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .option.active .option-check {
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .check-icon { display: none; }
+    .option.active .check-icon { display: block; }
+
+    .option-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .option-sample {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Generate button */
+    .gen-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #0077aa, #00aad4);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-family: var(--sans);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .gen-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
+    }
+
+    .gen-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0,170,210,0.35);
+    }
+
+    .gen-btn:active { transform: translateY(0); }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 20px;
+      border-radius: 50px;
+      letter-spacing: 0.05em;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .footer a { color: var(--blue-dim); text-decoration: none; }
+
+    @media (max-width: 400px) {
+      .card { padding: 24px 18px; }
+      #password-output { font-size: 15px; }
+      .options-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+  <div class="header">
+    <div class="logo">
+      <svg class="logo-icon" viewBox="0 0 36 36" fill="none">
+        <rect x="6" y="14" width="24" height="18" rx="4" fill="#0e1628" stroke="#00c8ff" stroke-width="1.5"/>
+        <path d="M12 14V10a6 6 0 1 1 12 0v4" stroke="#00c8ff" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="18" cy="23" r="3" fill="#00c8ff"/>
+        <line x1="18" y1="26" x2="18" y2="29" stroke="#00c8ff" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span class="logo-text">Vault<span>Key</span></span>
+    </div>
+    <div class="tagline">Secure Password Generator</div>
+  </div>
+
+  <div class="card">
+    <!-- Output -->
+    <div class="output-wrap">
+      <div id="password-output" class="placeholder">Click generate to create a password</div>
+      <button class="copy-btn" id="copy-btn" title="Copy password">
+        <svg id="copy-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+        <svg id="check-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Strength -->
+    <div class="strength-row">
+      <div class="strength-label">Strength</div>
+      <div class="strength-bars">
+        <div class="bar" id="b1"></div>
+        <div class="bar" id="b2"></div>
+        <div class="bar" id="b3"></div>
+        <div class="bar" id="b4"></div>
+      </div>
+      <div class="strength-name" id="strength-name" style="color: var(--muted)">—</div>
+    </div>
+
+    <!-- Length -->
+    <div class="section-label">Password Length</div>
+    <div class="length-row">
+      <div class="length-val" id="length-val">16</div>
+      <input type="range" id="length-slider" min="6" max="64" value="16"/>
+    </div>
+
+    <!-- Options -->
+    <div class="section-label">Character Types</div>
+    <div class="options-grid">
+      <div class="option active" data-key="upper" onclick="toggleOption(this)">
+        <div class="option-check">
+          <svg class="check-icon" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#080d1a" stroke-width="2.5" stroke-linecap="round"><polyline points="2 6 5 9 10 3"/></svg>
+        </div>
+        <div>
+          <div class="option-label">Uppercase</div>
+          <div class="option-sample">A B C … Z</div>
+        </div>
+      </div>
+      <div class="option active" data-key="lower" onclick="toggleOption(this)">
+        <div class="option-check">
+          <svg class="check-icon" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#080d1a" stroke-width="2.5" stroke-linecap="round"><polyline points="2 6 5 9 10 3"/></svg>
+        </div>
+        <div>
+          <div class="option-label">Lowercase</div>
+          <div class="option-sample">a b c … z</div>
+        </div>
+      </div>
+      <div class="option active" data-key="digits" onclick="toggleOption(this)">
+        <div class="option-check">
+          <svg class="check-icon" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#080d1a" stroke-width="2.5" stroke-linecap="round"><polyline points="2 6 5 9 10 3"/></svg>
+        </div>
+        <div>
+          <div class="option-label">Numbers</div>
+          <div class="option-sample">0 1 2 … 9</div>
+        </div>
+      </div>
+      <div class="option active" data-key="symbols" onclick="toggleOption(this)">
+        <div class="option-check">
+          <svg class="check-icon" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#080d1a" stroke-width="2.5" stroke-linecap="round"><polyline points="2 6 5 9 10 3"/></svg>
+        </div>
+        <div>
+          <div class="option-label">Symbols</div>
+          <div class="option-sample">! @ # $ % &amp;</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate -->
+    <button class="gen-btn" onclick="generate()">⚡ Generate Password</button>
+  </div>
+
+  <div class="footer">
+    Generated locally in your browser &mdash; never sent to any server.<br/>
+    <a href="https://github.com/shaiqueansari1604-png/password-generator" target="_blank">View on GitHub →</a>
+  </div>
+</div>
+
+<div class="toast" id="toast">✓ Copied to clipboard</div>
+
+<script>
+  const CHARS = {
+    upper:   'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+    lower:   'abcdefghijklmnopqrstuvwxyz',
+    digits:  '0123456789',
+    symbols: '!@#$%^&*()_+-=[]{}|;:,.<>?'
+  };
+
+  const slider = document.getElementById('length-slider');
+  const lenVal = document.getElementById('length-val');
+  const output = document.getElementById('password-output');
+
+  // Sync slider
+  slider.addEventListener('input', () => {
+    lenVal.textContent = slider.value;
+    updateSliderFill();
+  });
+
+  function updateSliderFill() {
+    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    slider.style.background = linear-gradient(90deg, #00aad4 ${pct}%, #1a2540 ${pct}%);
+  }
+  updateSliderFill();
+
+  function toggleOption(el) {
+    const actives = document.querySelectorAll('.option.active');
+    if (el.classList.contains('active') && actives.length === 1) return; // keep at least 1
+    el.classList.toggle('active');
+  }
+
+  function getCharset() {
+    let s = '';
+    document.querySelectorAll('.option.active').forEach(el => {
+      s += CHARS[el.dataset.key];
+    });
+    return s;
+  }
+
+  function secureRandom(max) {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] % max;
+  }
+
+  function generate() {
+    const len = parseInt(slider.value);
+    const charset = getCharset();
+    if (!charset) return;
+
+    let pwd = '';
+    // Guarantee at least one char from each active type
+    document.querySelectorAll('.option.active').forEach(el => {
+      const c = CHARS[el.dataset.key];
+      pwd += c[secureRandom(c.length)];
+    });
+    while (pwd.length < len) {
+      pwd += charset[secureRandom(charset.length)];
+    }
+    // Shuffle
+    pwd = pwd.split('').sort(() => secureRandom(3) - 1).join('');
+
+    output.classList.remove('placeholder', 'flash');
+    void output.offsetWidth; // reflow
+    output.classList.add('flash');
+    output.textContent = pwd;
+    updateStrength(pwd);
+  }
+
+  function updateStrength(pwd) {
+    let score = 0;
+    if (pwd.length >= 12) score++;
+    if (pwd.length >= 20) score++;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+    const level = score <= 1 ? 1 : score <= 2 ? 2 : score <= 3 ? 3 : 4;
+    const colors = ['', '#ff4d6d', '#ffc94d', '#00c8ff', '#00e87a'];
+    const names  = ['', 'Weak', 'Fair', 'Strong', 'Excellent'];
+
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById('b' + i).style.background =
+        i <= level ? colors[level] : 'var(--border)';
+    }
+    const sn = document.getElementById('strength-name');
+    sn.textContent = names[level];
+    sn.style.color = colors[level];
+  }
+
+  // Copy
+  document.getElementById('copy-btn').addEventListener('click', () => {
+    const pwd = output.textContent;
+    if (!pwd || output.classList.contains('placeholder')) return;
+    navigator.clipboard.writeText(pwd).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.classList.add('copied');
+      document.getElementById('copy-icon').style.display = 'none';
+      document.getElementById('check-icon').style.display = 'block';
+      showToast();
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        document.getElementById('copy-icon').style.display = 'block';
+        document.getElementById('check-icon').style.display = 'none';
+      }, 2000);
+    });
+  });
+
+  function showToast() {
+    const t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // Auto-generate on load
+  generate();
+</script>
+</body>
+</html>
